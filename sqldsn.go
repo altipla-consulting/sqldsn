@@ -6,7 +6,14 @@ import (
 	"strings"
 )
 
+// Deprecated: Use FromURL instead.
 func PrismaToGo(dsn string) string {
+	return FromURL(dsn)
+}
+
+// FromURL takes a URL format and converts it to the specific format of
+// each kind of SQL driver.
+func FromURL(dsn string) string {
 	switch {
 	case strings.HasPrefix(dsn, "mysql://"):
 		u, err := url.Parse(dsn)
@@ -14,9 +21,15 @@ func PrismaToGo(dsn string) string {
 			panic(err)
 		}
 		pass, _ := u.User.Password()
-		if u.Query().Has("socket") {
+
+		switch {
+		case u.Host == "cloudsql":
+			return fmt.Sprintf("%s:%s@cloudsql-mysql(%s)/%s?parseTime=true", u.User.Username(), pass, u.Query().Get("socket"), u.Path[1:])
+
+		case u.Query().Has("socket"):
 			return fmt.Sprintf("%s:%s@unix(%s)/%s?parseTime=true", u.User.Username(), pass, u.Query().Get("socket"), u.Path[1:])
-		} else {
+
+		default:
 			if u.Port() == "" {
 				return fmt.Sprintf("%s:%s@tcp(%s)/%s?parseTime=true", u.User.Username(), pass, u.Hostname(), u.Path[1:])
 			} else {
